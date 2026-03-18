@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Pause } from 'lucide-react';
 import { PhaserGame } from './components/PhaserGame';
 import { Terminal } from './components/Terminal';
 import { EventBus } from './EventBus';
@@ -7,27 +8,60 @@ import { EventBus } from './EventBus';
 export default function App() {
   const [gameState, setGameState] = useState<'home' | 'playing' | 'won' | 'help'>('home');
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
+  const [currentLevel, setCurrentLevel] = useState('MainScene');
   const [hasSavedGame, setHasSavedGame] = useState(false);
+  const [health, setHealth] = useState(9);
+  const [isPaused, setIsPaused] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('savedLevel');
-    if (saved === 'MainScene' || saved === 'Level2') {
+    if (saved === 'MainScene' || saved === 'Level2' || saved === 'Level3') {
       setHasSavedGame(true);
     }
   }, []);
 
   useEffect(() => {
-    const handleOpenTerminal = () => setIsTerminalOpen(true);
+    const handleOpenTerminal = (level: string = 'MainScene') => {
+      setCurrentLevel(level);
+      setIsTerminalOpen(true);
+    };
     const handleGameWon = () => setGameState('won');
+    const handleGameOver = () => {
+      localStorage.removeItem('savedLevel');
+      localStorage.removeItem('health');
+      setHasSavedGame(false);
+      setGameState('home');
+    };
+    const handleUpdateHealth = (h: number) => setHealth(h);
 
     EventBus.on('open-terminal', handleOpenTerminal);
     EventBus.on('game-won', handleGameWon);
+    EventBus.on('game-over', handleGameOver);
+    EventBus.on('update-health', handleUpdateHealth);
 
     return () => {
       EventBus.off('open-terminal', handleOpenTerminal);
       EventBus.off('game-won', handleGameWon);
+      EventBus.off('game-over', handleGameOver);
+      EventBus.off('update-health', handleUpdateHealth);
     };
   }, []);
+
+  const handlePause = () => {
+    setIsPaused(true);
+    EventBus.emit('pause-game');
+  };
+
+  const handleResume = () => {
+    setIsPaused(false);
+    EventBus.emit('resume-game');
+  };
+
+  const handleQuit = () => {
+    setIsPaused(false);
+    EventBus.emit('resume-game');
+    setGameState('home');
+  };
 
   const closeTerminal = () => {
     setIsTerminalOpen(false);
@@ -36,6 +70,7 @@ export default function App() {
 
   const startNewGame = () => {
     localStorage.removeItem('savedLevel');
+    localStorage.removeItem('health');
     setGameState('playing');
   };
 
@@ -172,6 +207,46 @@ export default function App() {
     <div className="w-screen h-screen overflow-hidden bg-black relative">
       <PhaserGame />
 
+      {/* HUD */}
+      <div className="absolute top-4 left-4 z-40 flex items-center gap-4">
+        <div className="flex items-center gap-2 bg-black/80 p-3 rounded border-2 border-green-500/50 shadow-lg shadow-green-900/20">
+          <div className="text-green-500 text-sm font-bold tracking-widest">HP</div>
+          <div className="flex gap-1">
+            {[...Array(9)].map((_, i) => (
+              <div key={i} className={`w-3 h-5 rounded-sm ${i < health ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-zinc-800'}`} />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="absolute top-4 right-4 z-40">
+        <button onClick={handlePause} className="bg-black/80 p-3 rounded border-2 border-green-500/50 text-green-500 hover:bg-green-500 hover:text-black transition-all shadow-lg shadow-green-900/20">
+          <Pause size={24} />
+        </button>
+      </div>
+
+      {/* Pause Menu */}
+      <AnimatePresence>
+        {isPaused && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/90 z-50 flex flex-col items-center justify-center font-mono backdrop-blur-sm"
+          >
+            <h2 className="text-6xl text-green-500 mb-12 font-bold tracking-widest drop-shadow-[0_0_15px_rgba(34,197,94,0.5)]">PAUSED</h2>
+            <div className="flex flex-col gap-4 w-64">
+              <button onClick={handleResume} className="w-full px-8 py-4 border-2 border-green-500 bg-green-500/10 hover:bg-green-500 hover:text-black transition-colors text-xl font-bold text-green-500">
+                RESUME
+              </button>
+              <button onClick={handleQuit} className="w-full px-8 py-4 border-2 border-zinc-500 text-zinc-400 hover:border-red-500 hover:text-red-500 hover:bg-red-500/10 transition-colors text-xl font-bold">
+                QUIT TO MENU
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {isTerminalOpen && (
           <motion.div
@@ -181,7 +256,7 @@ export default function App() {
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
             className="absolute bottom-0 left-0 w-full h-1/2 z-50"
           >
-            <Terminal onClose={closeTerminal} />
+            <Terminal onClose={closeTerminal} level={currentLevel} />
           </motion.div>
         )}
       </AnimatePresence>

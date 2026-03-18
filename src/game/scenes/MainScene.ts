@@ -36,6 +36,14 @@ export class MainScene extends Scene {
 
   create() {
     localStorage.setItem('savedLevel', 'MainScene');
+    let currentHealth = this.registry.get('health');
+    EventBus.emit('update-health', currentHealth || 9);
+
+    const onPause = () => this.scene.pause();
+    const onResume = () => this.scene.resume();
+    EventBus.on('pause-game', onPause);
+    EventBus.on('resume-game', onResume);
+
     this.cameras.main.setBackgroundColor('#8BC34A'); // Grass green
     const { width, height } = this.scale;
 
@@ -146,10 +154,14 @@ export class MainScene extends Scene {
     this.events.on('destroy', () => {
       EventBus.off('door-unlocked', this.onDoorUnlocked);
       EventBus.off('terminal-closed', this.onTerminalClosed);
+      EventBus.off('pause-game', onPause);
+      EventBus.off('resume-game', onResume);
     });
     this.events.on('shutdown', () => {
       EventBus.off('door-unlocked', this.onDoorUnlocked);
       EventBus.off('terminal-closed', this.onTerminalClosed);
+      EventBus.off('pause-game', onPause);
+      EventBus.off('resume-game', onResume);
     });
   }
 

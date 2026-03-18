@@ -127,5 +127,16 @@ export const SPRITES = {
     "..PPPP..",
     ".PPPPPP.",
     "........"
+  ],
+  robot: [
+    "........",
+    "..MMMM..",
+    ".MRRMRM.",
+    ".MMMMMM.",
+    "..MMMM..",
+    ".M.MM.M.",
+    ".M.MM.M.",
+    "...MM...",
+    "..M..M.."
   ]
 };

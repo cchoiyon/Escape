@@ -2,6 +2,7 @@ import { AUTO, Game } from 'phaser';
 import { Boot } from './scenes/Boot';
 import { MainScene } from './scenes/MainScene';
 import { Level2 } from './scenes/Level2';
+import { Level3 } from './scenes/Level3';
 
 const config: Phaser.Types.Core.GameConfig = {
     type: AUTO,
@@ -19,7 +20,8 @@ const config: Phaser.Types.Core.GameConfig = {
     scene: [
         Boot,
         MainScene,
-        Level2
+        Level2,
+        Level3
     ]
 };
 

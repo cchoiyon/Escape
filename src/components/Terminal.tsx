@@ -7,9 +7,10 @@ import { X } from 'lucide-react';
 
 interface TerminalProps {
   onClose: () => void;
+  level: string;
 }
 
-export const Terminal = ({ onClose }: TerminalProps) => {
+export const Terminal = ({ onClose, level }: TerminalProps) => {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
 
@@ -31,7 +32,6 @@ export const Terminal = ({ onClose }: TerminalProps) => {
     term.loadAddon(fitAddon);
     term.open(terminalRef.current);
     
-    // Use ResizeObserver to fit the terminal when its container changes size (e.g., during animation)
     const resizeObserver = new ResizeObserver(() => {
       try {
         if (terminalRef.current && terminalRef.current.clientWidth > 0) {
@@ -44,7 +44,6 @@ export const Terminal = ({ onClose }: TerminalProps) => {
     
     resizeObserver.observe(terminalRef.current);
 
-    // Initial fit and focus after a short delay to ensure DOM is ready
     setTimeout(() => {
       try {
         if (terminalRef.current && terminalRef.current.clientWidth > 0) {
@@ -61,6 +60,7 @@ export const Terminal = ({ onClose }: TerminalProps) => {
     };
 
     term.writeln('FARM-OS v1.0.4');
+    term.writeln(`Connected to: ${level === 'Level2' ? 'SECURITY_TERMINAL' : 'MAIN_TERMINAL'}`);
     term.writeln('Type "help" for a list of commands.');
     prompt();
 
@@ -77,33 +77,76 @@ export const Terminal = ({ onClose }: TerminalProps) => {
           term.writeln('  cat      - Read file contents');
           term.writeln('  clear    - Clear terminal screen');
           term.writeln('  exit     - Close terminal');
+          if (level === 'Level2') {
+            term.writeln('  ./       - Execute a script');
+          }
           break;
         case 'ls':
-          term.writeln('farm_logs.txt    portal_config.conf');
+          if (level === 'Level2') {
+            term.writeln('robot_logs.txt    disable_robots.sh');
+          } else {
+            term.writeln('farm_logs.txt    portal_config.conf');
+          }
           break;
         case 'cat':
-          if (args[1] === 'portal_config.conf') {
-            term.writeln('PORTAL_STATUS=LOCKED');
-            term.writeln('EMERGENCY_OVERRIDE_CMD=sudo unlock');
-          } else if (args[1] === 'farm_logs.txt') {
-            term.writeln('Day 1: Planted parsnips.');
-            term.writeln('Day 2: Watered crops. Found a locked portal.');
-            term.writeln('Day 3: Need to find a way to open the portal.');
-          } else if (!args[1]) {
-            term.writeln('cat: missing file operand');
+          if (level === 'Level2') {
+            if (args[1] === 'robot_logs.txt') {
+              term.writeln('WARNING: Security robots activated.');
+              term.writeln('To disable, run the disable script with sudo.');
+            } else if (args[1] === 'disable_robots.sh') {
+              term.writeln('#!/bin/bash');
+              term.writeln('echo "Disabling robots..."');
+              term.writeln('systemctl stop robot-patrol');
+            } else if (!args[1]) {
+              term.writeln('cat: missing file operand');
+            } else {
+              term.writeln(`cat: ${args[1]}: No such file or directory`);
+            }
           } else {
-            term.writeln(`cat: ${args[1]}: No such file or directory`);
+            if (args[1] === 'portal_config.conf') {
+              term.writeln('PORTAL_STATUS=LOCKED');
+              term.writeln('EMERGENCY_OVERRIDE_CMD=sudo unlock');
+            } else if (args[1] === 'farm_logs.txt') {
+              term.writeln('Day 1: Planted parsnips.');
+              term.writeln('Day 2: Watered crops. Found a locked portal.');
+              term.writeln('Day 3: Need to find a way to open the portal.');
+            } else if (!args[1]) {
+              term.writeln('cat: missing file operand');
+            } else {
+              term.writeln(`cat: ${args[1]}: No such file or directory`);
+            }
           }
           break;
         case 'sudo':
-          if (args[1] === 'unlock') {
-            term.writeln('Access Granted. Portal Unlocked...');
-            EventBus.emit('door-unlocked');
-            setTimeout(() => {
-              onClose();
-            }, 1500);
+          if (level === 'Level2') {
+            if (args[1] === './disable_robots.sh') {
+              term.writeln('Executing disable_robots.sh...');
+              term.writeln('Robots disabled successfully.');
+              term.writeln('Access Granted. Next Portal Unlocked...');
+              EventBus.emit('robots-disabled');
+              setTimeout(() => {
+                onClose();
+              }, 1500);
+            } else {
+              term.writeln('sudo: command not found or unauthorized');
+            }
           } else {
-            term.writeln('sudo: command not found or unauthorized');
+            if (args[1] === 'unlock') {
+              term.writeln('Access Granted. Portal Unlocked...');
+              EventBus.emit('door-unlocked');
+              setTimeout(() => {
+                onClose();
+              }, 1500);
+            } else {
+              term.writeln('sudo: command not found or unauthorized');
+            }
+          }
+          break;
+        case './disable_robots.sh':
+          if (level === 'Level2') {
+            term.writeln('Permission denied. Try running with sudo.');
+          } else {
+            term.writeln(`Command not found: ${command}`);
           }
           break;
         case 'clear':
@@ -134,7 +177,6 @@ export const Terminal = ({ onClose }: TerminalProps) => {
           }
           break;
         default:
-          // Only allow printable characters
           if (e >= String.fromCharCode(0x20) && e <= String.fromCharCode(0x7E) || e >= '\u00a0') {
             input += e;
             term.write(e);
@@ -146,7 +188,7 @@ export const Terminal = ({ onClose }: TerminalProps) => {
       resizeObserver.disconnect();
       term.dispose();
     };
-  }, [onClose]);
+  }, [onClose, level]);
 
   return (
     <div className="w-full h-full bg-black border-t-4 border-green-500 flex flex-col shadow-2xl relative">
