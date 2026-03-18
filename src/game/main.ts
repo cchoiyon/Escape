@@ -1,4 +1,5 @@
 import { AUTO, Game } from 'phaser';
+import { Boot } from './scenes/Boot';
 import { MainScene } from './scenes/MainScene';
 import { Level2 } from './scenes/Level2';
 
@@ -16,6 +17,7 @@ const config: Phaser.Types.Core.GameConfig = {
         }
     },
     scene: [
+        Boot,
         MainScene,
         Level2
     ]

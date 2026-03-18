@@ -12,6 +12,7 @@ export class Level2 extends Scene {
   }
 
   create() {
+    localStorage.setItem('savedLevel', 'Level2');
     this.cameras.main.setBackgroundColor('#8BC34A');
     const { width, height } = this.scale;
 
@@ -22,15 +23,46 @@ export class Level2 extends Scene {
     if (!this.textures || !this.textures.exists('farmer')) {
       generatePixelTexture(this, 'farmer', SPRITES.farmer, 4);
     }
+    if (!this.textures || !this.textures.exists('fence')) {
+      generatePixelTexture(this, 'fence', SPRITES.fence, 4);
+    }
+    if (!this.textures || !this.textures.exists('portalUnlocked')) {
+      generatePixelTexture(this, 'portalUnlocked', SPRITES.portalUnlocked, 4);
+    }
+
+    // Create a back portal
+    const backPortal = this.physics.add.staticSprite(16, height / 2, 'portalUnlocked');
+    this.add.text(60, height / 2 - 60, 'BACK', {
+      fontSize: '20px',
+      color: '#10b981',
+      fontStyle: 'bold',
+      stroke: '#000000',
+      strokeThickness: 3
+    }).setOrigin(0.5);
+
+    // Create obstacles (fences) to make it harder
+    const walls = this.physics.add.staticGroup();
+    
+    // Top and bottom boundaries
+    for (let i = 0; i < width; i += 32) walls.create(i + 16, 16, 'fence');
+    for (let i = 0; i < width; i += 32) walls.create(i + 16, height - 16, 'fence');
+    
+    // Maze-like obstacles
+    for (let i = 100; i < 400; i += 32) walls.create(300, i, 'fence');
+    for (let i = 200; i < 500; i += 32) walls.create(500, i, 'fence');
+    for (let i = 100; i < 400; i += 32) walls.create(700, i, 'fence');
 
     // Create a farm plot
-    for (let x = 200; x < 600; x += 40) {
-      for (let y = 200; y < 400; y += 40) {
-        this.add.sprite(x, y, 'crop');
+    for (let x = 150; x < 750; x += 40) {
+      for (let y = 100; y < 500; y += 40) {
+        // Don't place crops on top of walls
+        if (x !== 310 && x !== 510 && x !== 710) {
+          this.add.sprite(x, y, 'crop');
+        }
       }
     }
 
-    this.add.text(width / 2, 100, 'LEVEL 2: The Farm', {
+    this.add.text(width / 2, 50, 'LEVEL 2: The Farm', {
       fontSize: '32px',
       color: '#ffffff',
       fontStyle: 'bold',
@@ -38,15 +70,24 @@ export class Level2 extends Scene {
       strokeThickness: 4
     }).setOrigin(0.5);
 
-    this.add.text(width / 2, 150, 'Walk right to finish', {
+    this.add.text(width / 2, 90, 'Navigate the maze to finish', {
       fontSize: '16px',
       color: '#ffffff'
     }).setOrigin(0.5);
 
-    this.player = this.physics.add.sprite(50, height / 2, 'farmer');
+    this.player = this.physics.add.sprite(100, height / 2, 'farmer');
     this.player.setCollideWorldBounds(true);
     // Allow walking off the right edge
     this.physics.world.setBounds(0, 0, width + 100, height);
+
+    this.physics.add.collider(this.player, walls);
+
+    // Back portal overlap
+    this.physics.add.overlap(this.player, backPortal, () => {
+      if (!this.sys || !this.sys.isActive()) return;
+      backPortal.destroy();
+      this.scene.start('MainScene', { fromLevel2: true });
+    });
 
     if (this.input.keyboard) {
       this.cursors = this.input.keyboard.createCursorKeys();

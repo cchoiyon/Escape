@@ -13,6 +13,7 @@ export class MainScene extends Scene {
   private interactText!: GameObjects.Text;
   private isTerminalOpen: boolean = false;
   private isDoorUnlocked: boolean = false;
+  private spawnFromLevel2: boolean = false;
 
   private onDoorUnlocked!: () => void;
   private onTerminalClosed!: () => void;
@@ -29,7 +30,12 @@ export class MainScene extends Scene {
     generatePixelTexture(this, 'computer', SPRITES.computer, 4);
   }
 
+  init(data: { fromLevel2?: boolean }) {
+    this.spawnFromLevel2 = data.fromLevel2 || false;
+  }
+
   create() {
+    localStorage.setItem('savedLevel', 'MainScene');
     this.cameras.main.setBackgroundColor('#8BC34A'); // Grass green
     const { width, height } = this.scale;
 
@@ -55,13 +61,35 @@ export class MainScene extends Scene {
     this.computer = this.physics.add.staticSprite(width / 2, height / 2, 'computer');
 
     // Create Player
-    this.player = this.physics.add.sprite(100, height / 2, 'farmer');
+    const spawnX = this.spawnFromLevel2 ? width - 60 : 100;
+    this.player = this.physics.add.sprite(spawnX, height / 2, 'farmer');
     this.player.setCollideWorldBounds(true);
 
     // Collisions
     this.physics.add.collider(this.player, walls);
     this.doorCollider = this.physics.add.collider(this.player, this.door);
     this.physics.add.collider(this.player, this.computer);
+
+    // If coming from Level 2, door is already unlocked
+    if (this.spawnFromLevel2) {
+      this.isDoorUnlocked = true;
+      this.door.setTexture('portalUnlocked');
+      this.physics.world.removeCollider(this.doorCollider);
+      
+      this.physics.add.overlap(this.player, this.door, () => {
+        if (!this.sys || !this.sys.isActive()) return;
+        this.door.destroy();
+        this.scene.start('Level2');
+      });
+
+      this.add.text(width - 60, height / 2 - 60, 'ENTER', {
+        fontSize: '20px',
+        color: '#10b981',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 3
+      }).setOrigin(0.5);
+    }
 
     // Input
     if (this.input.keyboard) {
