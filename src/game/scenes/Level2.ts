@@ -1,105 +1,82 @@
-import { Scene, Physics, GameObjects } from 'phaser';
+import { BaseLevel } from './BaseLevel';
 import { EventBus } from '../../EventBus';
 import { generatePixelTexture, SPRITES } from '../utils/textures';
 
-export class Level2 extends Scene {
-  private player!: Physics.Arcade.Sprite;
-  private computer!: Physics.Arcade.Sprite;
-  private robots!: Physics.Arcade.Group;
-  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
-  private wasd!: any;
-  private interactKey!: Phaser.Input.Keyboard.Key;
-  private interactText!: GameObjects.Text;
-  
-  private isTerminalOpen: boolean = false;
+interface RobotSprite extends Phaser.Physics.Arcade.Sprite {
+  health: number;
+  healthBar: Phaser.GameObjects.Graphics;
+}
+
+export class Level2 extends BaseLevel {
+  private robots!: Phaser.Physics.Arcade.Group;
+  private bullets!: Phaser.Physics.Arcade.Group;
   private isRobotsDisabled: boolean = false;
-  private onTerminalClosed!: () => void;
-  private onRobotsDisabled!: () => void;
+  private areRobotsDead: boolean = false;
 
   constructor() {
-    super('Level2');
+    super('Level2', 2, 'Level3', 'MainScene', "Kill all robots first. Then use 'grep' in 'security_scripts/security_logs.txt' to find the ACCESS_CODE. Use 'unlock_portal [code]' to open the gate.");
   }
 
-  create() {
-    localStorage.setItem('savedLevel', 'Level2');
-    let currentHealth = this.registry.get('health');
-    EventBus.emit('update-health', currentHealth || 9);
+  protected customPreload() {
+    generatePixelTexture(this, 'robot', SPRITES.robot, 4);
+    generatePixelTexture(this, 'bullet', SPRITES.bullet, 4);
+  }
 
-    const onPause = () => this.scene.pause();
-    const onResume = () => this.scene.resume();
-    EventBus.on('pause-game', onPause);
-    EventBus.on('resume-game', onResume);
+  protected setupEventListeners() {
+    EventBus.on('robots-disabled', this.handleRobotsDisabled, this);
+    EventBus.on('level2-portal-unlocked', this.handlePortalUnlockAttempt, this);
+  }
 
-    this.cameras.main.setBackgroundColor('#8BC34A');
+  private handleRobotsDisabled() {
+    this.isRobotsDisabled = true;
+    this.robots.children.iterate((child: any) => {
+      const robot = child as RobotSprite;
+      robot.setVelocity(0, 0);
+      robot.setTint(0x555555);
+      if (robot.healthBar) robot.healthBar.setVisible(false);
+      return true;
+    });
+  }
+
+  private handlePortalUnlockAttempt() {
+    if (this.areRobotsDead || this.isRobotsDisabled) {
+      this.unlockPortal();
+    } else {
+      // This shouldn't happen if the terminal logic is right, but good for safety
+      // Maybe show a message that robots are still active
+    }
+  }
+
+  protected cleanupEventListeners() {
+    EventBus.off('robots-disabled', this.handleRobotsDisabled, this);
+    EventBus.off('level2-portal-unlocked', this.handlePortalUnlockAttempt, this);
+  }
+
+  protected customCreate() {
     const { width, height } = this.scale;
-
-    // Ensure textures exist
-    if (!this.textures || !this.textures.exists('crop')) generatePixelTexture(this, 'crop', SPRITES.crop, 4);
-    if (!this.textures || !this.textures.exists('farmer')) generatePixelTexture(this, 'farmer', SPRITES.farmer, 4);
-    if (!this.textures || !this.textures.exists('fence')) generatePixelTexture(this, 'fence', SPRITES.fence, 4);
-    if (!this.textures || !this.textures.exists('portalUnlocked')) generatePixelTexture(this, 'portalUnlocked', SPRITES.portalUnlocked, 4);
-    if (!this.textures || !this.textures.exists('computer')) generatePixelTexture(this, 'computer', SPRITES.computer, 4);
-    if (!this.textures || !this.textures.exists('robot')) generatePixelTexture(this, 'robot', SPRITES.robot, 4);
-
-    // Create a back portal
-    const backPortal = this.physics.add.staticSprite(16, height / 2, 'portalUnlocked');
-    this.add.text(60, height / 2 - 60, 'BACK', {
-      fontSize: '20px', color: '#10b981', fontStyle: 'bold', stroke: '#000000', strokeThickness: 3
-    }).setOrigin(0.5);
-
-    // Create safe zone (fences)
-    const walls = this.physics.add.staticGroup();
-    
-    // Top and bottom boundaries
-    for (let i = 0; i < width; i += 32) walls.create(i + 16, 16, 'fence');
-    for (let i = 0; i < width; i += 32) walls.create(i + 16, height - 16, 'fence');
-    
-    // Safe zone box in the middle (with a small opening on the left)
-    const safeZoneX = width / 2;
-    const safeZoneY = height / 2;
-    for (let i = -100; i <= 100; i += 32) {
-      walls.create(safeZoneX + i, safeZoneY - 100, 'fence'); // Top wall of safe zone
-      walls.create(safeZoneX + i, safeZoneY + 100, 'fence'); // Bottom wall of safe zone
-    }
-    for (let i = -100; i <= 100; i += 32) {
-      walls.create(safeZoneX + 100, safeZoneY + i, 'fence'); // Right wall of safe zone
-      if (i < -30 || i > 30) {
-        walls.create(safeZoneX - 100, safeZoneY + i, 'fence'); // Left wall with opening
-      }
-    }
-
-    // Computer inside safe zone
-    this.computer = this.physics.add.staticSprite(safeZoneX, safeZoneY, 'computer');
-
     this.add.text(width / 2, 50, 'LEVEL 2: Security Breach', {
-      fontSize: '32px', color: '#ffffff', fontStyle: 'bold', stroke: '#000000', strokeThickness: 4
+      fontSize: '32px', color: '#00ff00', fontStyle: 'bold', stroke: '#000000', strokeThickness: 4
     }).setOrigin(0.5);
 
-    this.add.text(width / 2, 90, 'Get to the safe zone and disable the robots!', {
+    this.add.text(width / 2, 90, 'Click to shoot! (3 hits to destroy robots)', {
       fontSize: '16px', color: '#ffffff'
     }).setOrigin(0.5);
 
-    // Player
-    this.player = this.physics.add.sprite(100, height / 2, 'farmer');
-    this.player.setCollideWorldBounds(true);
+    // Bullets
+    this.bullets = this.physics.add.group();
 
     // Robots
     this.robots = this.physics.add.group();
-    const robot1 = this.robots.create(width - 100, height / 4, 'robot');
-    const robot2 = this.robots.create(width - 100, height * 3 / 4, 'robot');
-    
-    this.robots.children.iterate((child: any) => {
-      child.setCollideWorldBounds(true);
-      child.setBounce(1);
+    this.createRobot(width - 100, height / 4);
+    this.createRobot(width - 100, height * 3 / 4);
+
+    // Shooting input
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (this.isTerminalOpen) return;
+      this.shoot(pointer.worldX, pointer.worldY);
     });
 
     // Collisions
-    this.physics.add.collider(this.player, walls);
-    this.physics.add.collider(this.robots, walls);
-    this.physics.add.collider(this.player, this.computer);
-    this.physics.add.collider(this.robots, this.robots);
-
-    // Robot hits player
     this.physics.add.overlap(this.player, this.robots, () => {
       if (!this.isRobotsDisabled) {
         let h = this.registry.get('health') || 9;
@@ -112,124 +89,92 @@ export class Level2 extends Scene {
           EventBus.emit('game-over');
           this.scene.pause();
         } else {
-          // Reset player position if caught
           this.player.setPosition(100, height / 2);
+          this.cameras.main.flash(500, 255, 0, 0);
         }
       }
     });
 
-    // Back portal overlap
-    this.physics.add.overlap(this.player, backPortal, () => {
-      if (!this.sys || !this.sys.isActive()) return;
-      backPortal.destroy();
-      this.scene.start('MainScene', { fromLevel2: true });
-    });
-
-    // Input
-    if (this.input.keyboard) {
-      this.cursors = this.input.keyboard.createCursorKeys();
-      this.wasd = this.input.keyboard.addKeys({
-        up: Phaser.Input.Keyboard.KeyCodes.W,
-        down: Phaser.Input.Keyboard.KeyCodes.S,
-        left: Phaser.Input.Keyboard.KeyCodes.A,
-        right: Phaser.Input.Keyboard.KeyCodes.D
-      });
-      this.interactKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
-      this.input.keyboard.removeCapture('SPACE');
-    }
-
-    // Interact Text
-    this.interactText = this.add.text(safeZoneX, safeZoneY - 50, 'Press E to interact', {
-      fontSize: '16px', color: '#ffffff', backgroundColor: '#000000', padding: { x: 5, y: 5 }
-    }).setOrigin(0.5).setVisible(false);
-
-    // Event Listeners
-    this.onTerminalClosed = () => {
-      this.isTerminalOpen = false;
-    };
-    EventBus.on('terminal-closed', this.onTerminalClosed);
-
-    this.onRobotsDisabled = () => {
-      if (!this.sys || !this.sys.isActive()) return;
-      this.isRobotsDisabled = true;
-      
-      // Stop robots
-      this.robots.children.iterate((child: any) => {
-        child.setVelocity(0, 0);
-        child.setTint(0x555555); // Gray out disabled robots
-      });
-
-      // Create next portal
-      const nextPortal = this.physics.add.staticSprite(width - 50, height / 2, 'portalUnlocked');
-      this.add.text(width - 50, height / 2 - 60, 'NEXT', {
-        fontSize: '20px', color: '#10b981', fontStyle: 'bold', stroke: '#000000', strokeThickness: 3
-      }).setOrigin(0.5);
-
-      this.physics.add.overlap(this.player, nextPortal, () => {
-        if (!this.sys || !this.sys.isActive()) return;
-        nextPortal.destroy();
-        this.scene.start('Level3');
-      });
-    };
-    EventBus.on('robots-disabled', this.onRobotsDisabled);
-
-    this.events.on('destroy', () => {
-      EventBus.off('terminal-closed', this.onTerminalClosed);
-      EventBus.off('robots-disabled', this.onRobotsDisabled);
-      EventBus.off('pause-game', onPause);
-      EventBus.off('resume-game', onResume);
-    });
-    this.events.on('shutdown', () => {
-      EventBus.off('terminal-closed', this.onTerminalClosed);
-      EventBus.off('robots-disabled', this.onRobotsDisabled);
-      EventBus.off('pause-game', onPause);
-      EventBus.off('resume-game', onResume);
+    this.physics.add.overlap(this.bullets, this.robots, (bullet, robot) => {
+      this.handleBulletHit(bullet as Phaser.Physics.Arcade.Sprite, robot as RobotSprite);
     });
   }
 
-  update() {
-    if (this.isTerminalOpen) {
-      this.player.setVelocity(0);
-      return;
+  private createRobot(x: number, y: number) {
+    const robot = this.robots.create(x, y, 'robot') as RobotSprite;
+    robot.setCollideWorldBounds(true);
+    robot.setBounce(1);
+    robot.health = 3;
+    robot.healthBar = this.add.graphics();
+    this.updateHealthBar(robot);
+  }
+
+  private updateHealthBar(robot: RobotSprite) {
+    robot.healthBar.clear();
+    if (robot.health <= 0 || !robot.active) return;
+
+    const x = robot.x - 16;
+    const y = robot.y - 24;
+    const width = 32;
+    const height = 6;
+
+    // Background
+    robot.healthBar.fillStyle(0x000000);
+    robot.healthBar.fillRect(x, y, width, height);
+
+    // Health (3 segments for 3 hearts)
+    const segmentWidth = width / 3;
+    robot.healthBar.fillStyle(0xff0000);
+    for (let i = 0; i < robot.health; i++) {
+      robot.healthBar.fillRect(x + (i * segmentWidth) + 1, y + 1, segmentWidth - 2, height - 2);
     }
+  }
 
-    // Player Movement
-    const speed = 200;
-    let velocityX = 0;
-    let velocityY = 0;
+  private shoot(targetX: number, targetY: number) {
+    const bullet = this.bullets.create(this.player.x, this.player.y, 'bullet') as Phaser.Physics.Arcade.Sprite;
+    this.physics.moveTo(bullet, targetX, targetY, 400);
+    
+    // Destroy bullet after 2 seconds
+    this.time.delayedCall(2000, () => {
+      if (bullet.active) bullet.destroy();
+    });
+  }
 
-    if (this.cursors.left.isDown || this.wasd.left.isDown) velocityX = -speed;
-    else if (this.cursors.right.isDown || this.wasd.right.isDown) velocityX = speed;
+  private handleBulletHit(bullet: Phaser.Physics.Arcade.Sprite, robot: RobotSprite) {
+    bullet.destroy();
+    if (this.isRobotsDisabled) return;
 
-    if (this.cursors.up.isDown || this.wasd.up.isDown) velocityY = -speed;
-    else if (this.cursors.down.isDown || this.wasd.down.isDown) velocityY = speed;
+    robot.health--;
+    this.updateHealthBar(robot);
 
-    if (velocityX !== 0 && velocityY !== 0) {
-      velocityX *= 0.7071;
-      velocityY *= 0.7071;
+    // Flash robot red
+    robot.setTint(0xff0000);
+    this.time.delayedCall(100, () => {
+      if (robot.active) robot.clearTint();
+    });
+
+    if (robot.health <= 0) {
+      robot.healthBar.destroy();
+      robot.destroy();
+      
+      // Check if all robots are destroyed
+      if (this.robots.countActive() === 0) {
+        this.areRobotsDead = true;
+        this.add.text(this.scale.width / 2, 130, 'ROBOTS NEUTRALIZED. ACCESS TERMINAL.', {
+          fontSize: '16px', color: '#ffff00'
+        }).setOrigin(0.5);
+      }
     }
+  }
 
-    this.player.setVelocity(velocityX, velocityY);
-
-    // Robot AI (chase player)
+  protected customUpdate() {
     if (!this.isRobotsDisabled) {
       this.robots.children.iterate((child: any) => {
-        // Simple chase logic
-        this.physics.moveToObject(child, this.player, 60);
+        const robot = child as RobotSprite;
+        this.physics.moveToObject(robot, this.player, 60);
+        this.updateHealthBar(robot);
+        return true;
       });
-    }
-
-    // Interaction logic
-    const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.computer.x, this.computer.y);
-    if (distance < 80) {
-      this.interactText.setVisible(true);
-      if (Phaser.Input.Keyboard.JustDown(this.interactKey)) {
-        this.isTerminalOpen = true;
-        this.interactText.setVisible(false);
-        EventBus.emit('open-terminal', 'Level2');
-      }
-    } else {
-      this.interactText.setVisible(false);
     }
   }
 }

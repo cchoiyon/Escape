@@ -1,48 +1,24 @@
-import { Scene } from 'phaser';
-
+import { BaseLevel } from './BaseLevel';
 import { EventBus } from '../../EventBus';
 
-export class Level3 extends Scene {
-    constructor() {
-        super('Level3');
-    }
+export class Level3 extends BaseLevel {
+  constructor() {
+    super('Level3', 3, 'Level4', 'Level2', "Use 'ls -a' to find hidden files. Use 'grep' to find the passcode in the hidden system file.");
+  }
 
-    create() {
-        localStorage.setItem('savedLevel', 'Level3');
-        let currentHealth = this.registry.get('health');
-        EventBus.emit('update-health', currentHealth || 9);
+  protected setupEventListeners() {
+    EventBus.on('portal-activated', this.unlockPortal, this);
+  }
 
-        const onPause = () => this.scene.pause();
-        const onResume = () => this.scene.resume();
-        EventBus.on('pause-game', onPause);
-        EventBus.on('resume-game', onResume);
+  protected cleanupEventListeners() {
+    EventBus.off('portal-activated', this.unlockPortal, this);
+  }
 
-        this.events.on('shutdown', () => {
-            EventBus.off('pause-game', onPause);
-            EventBus.off('resume-game', onResume);
-        });
-        this.events.on('destroy', () => {
-            EventBus.off('pause-game', onPause);
-            EventBus.off('resume-game', onResume);
-        });
-
-        this.cameras.main.setBackgroundColor('#000000');
-        const { width, height } = this.scale;
-
-        this.add.text(width / 2, height / 2 - 50, 'LEVEL 3', {
-            fontSize: '48px',
-            color: '#00ff00',
-            fontStyle: 'bold',
-        }).setOrigin(0.5);
-
-        this.add.text(width / 2, height / 2 + 20, 'Under Construction...', {
-            fontSize: '24px',
-            color: '#ffffff',
-        }).setOrigin(0.5);
-
-        // Allow walking back to Level 2
-        this.input.keyboard?.once('keydown-SPACE', () => {
-            this.scene.start('Level2');
-        });
-    }
+  protected customCreate() {
+    this.add.text(this.scale.width / 2, 50, 'LEVEL 3: The Hidden Truth', {
+      fontSize: '32px', color: '#00ff00', fontStyle: 'bold', stroke: '#000000', strokeThickness: 4
+    }).setOrigin(0.5);
+    
+    this.cameras.main.setBackgroundColor('#050505'); // Dark room
+  }
 }

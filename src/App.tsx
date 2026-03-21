@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Pause } from 'lucide-react';
+import { Pause, X } from 'lucide-react';
 import { PhaserGame } from './components/PhaserGame';
 import { Terminal } from './components/Terminal';
 import { EventBus } from './EventBus';
@@ -12,10 +12,12 @@ export default function App() {
   const [hasSavedGame, setHasSavedGame] = useState(false);
   const [health, setHealth] = useState(9);
   const [isPaused, setIsPaused] = useState(false);
+  const [hint, setHint] = useState<string | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('savedLevel');
-    if (saved === 'MainScene' || saved === 'Level2' || saved === 'Level3') {
+    const validLevels = ['MainScene', 'Level2', 'Level3', 'Level4', 'Level5'];
+    if (validLevels.includes(saved || '')) {
       setHasSavedGame(true);
     }
   }, []);
@@ -33,17 +35,20 @@ export default function App() {
       setGameState('home');
     };
     const handleUpdateHealth = (h: number) => setHealth(h);
+    const handleShowHint = (text: string) => setHint(text);
 
     EventBus.on('open-terminal', handleOpenTerminal);
     EventBus.on('game-won', handleGameWon);
     EventBus.on('game-over', handleGameOver);
     EventBus.on('update-health', handleUpdateHealth);
+    EventBus.on('show-hint', handleShowHint);
 
     return () => {
       EventBus.off('open-terminal', handleOpenTerminal);
       EventBus.off('game-won', handleGameWon);
       EventBus.off('game-over', handleGameOver);
       EventBus.off('update-health', handleUpdateHealth);
+      EventBus.off('show-hint', handleShowHint);
     };
   }, []);
 
@@ -206,6 +211,35 @@ export default function App() {
   return (
     <div className="w-screen h-screen overflow-hidden bg-black relative">
       <PhaserGame />
+
+      <AnimatePresence>
+        {hint && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="absolute inset-0 z-[60] flex items-center justify-center p-8 pointer-events-none"
+          >
+            <div className="bg-zinc-900 border-2 border-blue-500 p-6 max-w-md shadow-[0_0_30px_rgba(59,130,246,0.3)] pointer-events-auto">
+              <div className="flex justify-between items-center mb-4 border-b border-blue-500/30 pb-2">
+                <h3 className="text-blue-400 font-bold tracking-widest">SYSTEM HINT</h3>
+                <button onClick={() => setHint(null)} className="text-zinc-500 hover:text-white">
+                  <X size={18} />
+                </button>
+              </div>
+              <p className="text-zinc-300 font-mono text-sm leading-relaxed">
+                {hint}
+              </p>
+              <button 
+                onClick={() => setHint(null)}
+                className="mt-6 w-full py-2 bg-blue-500/10 border border-blue-500 text-blue-500 hover:bg-blue-500 hover:text-black transition-all font-bold text-xs tracking-widest"
+              >
+                DISMISS
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* HUD */}
       <div className="absolute top-4 left-4 z-40 flex items-center gap-4">

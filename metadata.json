@@ -1,5 +1,5 @@
 {
-  "name": "Escape Pod Terminus",
-  "description": "A 2D  game where a player must use a terminal to escape a series of obstacles to reach his ship",
+  "name": "ESCAPE",
+  "description": "A digital farm escape game where you hack your way out using Linux terminal commands.",
   "requestFramePermissions": []
 }

@@ -16,7 +16,8 @@ export class Boot extends Scene {
             this.registry.set('health', 9);
         }
         
-        if (savedLevel && (savedLevel === 'MainScene' || savedLevel === 'Level2' || savedLevel === 'Level3')) {
+        const validLevels = ['MainScene', 'Level2', 'Level3', 'Level4', 'Level5'];
+        if (savedLevel && validLevels.includes(savedLevel)) {
             this.scene.start(savedLevel);
         } else {
             this.scene.start('MainScene');
